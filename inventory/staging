@@ -1,0 +1,6 @@
+[staging]
+3.15.34.97 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/hng-internship-keys.pem
+
+[staging:vars]
+env_name=staging
+ansible_python_interpreter=/usr/bin/python3

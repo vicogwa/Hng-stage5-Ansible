@@ -1,0 +1,21 @@
+module.exports = {
+  apps: [{
+    name: '{{ env_name }}-subutai-frontend',
+    script: 'npm',
+    args: '{{ frontend_start_command }}',
+    cwd: '{{ frontend_dir }}',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production',
+      PORT: {{ frontend_port }}
+    },
+    error_file: '{{ frontend_dir }}/logs/pm2-error.log',
+    out_file: '{{ frontend_dir }}/logs/pm2-out.log',
+    log_file: '{{ frontend_dir }}/logs/app.log',
+    time: true,
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+  }]
+};

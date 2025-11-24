@@ -1,0 +1,32 @@
+---
+# Environment Configuration
+deploy_env: staging
+env_name: staging
+project_name: subutai
+
+# Backend Configuration
+backend_repo: "git@github.com:vicogwa/content-creator-todo-be.git"
+backend_branch: main
+backend_port: 5000
+backend_domain: api.subutai.emerj.net
+backend_dir: "/var/www/staging-subutai-backend"
+backend_start_script: "server.js"
+
+# Frontend Configuration
+frontend_repo: "git@github.com:vicogwa/content-creator-todo-fe.git"
+frontend_branch: main
+frontend_port: 4545
+frontend_domain: subutai.emerj.net
+frontend_dir: "/var/www/staging-subutai-frontend"
+frontend_start_command: "start"
+
+# SSL Configuration
+ssl_email: victoriafrancis885@gmail.com
+
+# CloudWatch Log Groups
+log_group_backend: /ec2/staging/subutai/backend
+log_group_frontend: /ec2/staging/subutai/frontend
+log_group_nginx: /ec2/staging/subutai/nginx
+
+# AWS Configuration
+aws_region: us-east-2

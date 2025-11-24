@@ -1,0 +1,20 @@
+module.exports = {
+  apps: [{
+    name: '{{ env_name }}-subutai-backend',
+    script: '{{ backend_start_script }}',
+    cwd: '{{ backend_dir }}',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: '{{ env_name }}',
+      PORT: {{ backend_port }}
+    },
+    error_file: '{{ backend_dir }}/logs/pm2-error.log',
+    out_file: '{{ backend_dir }}/logs/pm2-out.log',
+    log_file: '{{ backend_dir }}/logs/app.log',
+    time: true,
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+  }]
+};

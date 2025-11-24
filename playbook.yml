@@ -1,0 +1,284 @@
+# Backup first
+---
+- name: Deploy Subutai Application (Frontend + Backend)
+  hosts: all
+  become: yes
+  vars_files:
+    - group_vars/all/vault.yml
+  
+  tasks:
+    - name: Create .ssh directory
+      file:
+        path: "/home/{{ ansible_user }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user }}"
+    
+    - name: Deploy backend GitHub SSH key
+      copy:
+        content: "{{ vault_backend_deploy_key }}"
+        dest: "/home/{{ ansible_user }}/.ssh/backend_deploy_key"
+        mode: '0600'
+        owner: "{{ ansible_user }}"
+    
+    - name: Deploy frontend GitHub SSH key
+      copy:
+        content: "{{ vault_frontend_deploy_key }}"
+        dest: "/home/{{ ansible_user }}/.ssh/frontend_deploy_key"
+        mode: '0600'
+        owner: "{{ ansible_user }}"
+    
+    - name: Add GitHub to known hosts
+      shell: ssh-keyscan github.com >> /home/{{ ansible_user }}/.ssh/known_hosts
+      become_user: "{{ ansible_user }}"
+      args:
+        creates: "/home/{{ ansible_user }}/.ssh/known_hosts"
+    
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+    
+    - name: Install system dependencies
+      apt:
+        name:
+          - nginx
+          - git
+          - python3-pip
+          - curl
+          - software-properties-common
+          - build-essential
+        state: present
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+    
+    - name: Verify Node.js installation
+      command: node --version
+      register: node_version
+      changed_when: false
+    
+    - name: Verify npm installation
+      command: npm --version
+      register: npm_version
+      changed_when: false
+    
+    - name: Display versions
+      debug:
+        msg:
+          - "Node.js: {{ node_version.stdout }}"
+          - "npm: {{ npm_version.stdout }}"
+    
+    - name: Install PM2 globally
+      command: npm install -g pm2
+      args:
+        creates: /usr/bin/pm2
+    
+    - name: Clone backend repository
+      git:
+        repo: "{{ backend_repo }}"
+        dest: "{{ backend_dir }}"
+        version: "{{ backend_branch }}"
+        key_file: "/home/{{ ansible_user }}/.ssh/backend_deploy_key"
+        accept_hostkey: yes
+        force: yes
+      become_user: "{{ ansible_user }}"
+    
+    - name: Create backend logs directory
+      file:
+        path: "{{ backend_dir }}/logs"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+    
+    - name: Copy backend environment secrets
+      copy:
+        src: "secrets/{{ env_name }}-backend.env"
+        dest: "{{ backend_dir }}/.env"
+        mode: '0600'
+        owner: "{{ ansible_user }}"
+    
+    - name: Install backend dependencies
+      command: npm install
+      args:
+        chdir: "{{ backend_dir }}"
+      become_user: "{{ ansible_user }}"
+    
+    - name: Deploy PM2 backend configuration
+      template:
+        src: templates/pm2-backend.config.js.j2
+        dest: "{{ backend_dir }}/ecosystem.config.js"
+        owner: "{{ ansible_user }}"
+    
+    - name: Stop existing PM2 backend process
+      shell: pm2 delete {{ env_name }}-subutai-backend || true
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+    
+    - name: Start backend with PM2
+      shell: pm2 start ecosystem.config.js
+      args:
+        chdir: "{{ backend_dir }}"
+      become_user: "{{ ansible_user }}"
+    
+    - name: Save PM2 process list
+      shell: pm2 save
+      become_user: "{{ ansible_user }}"
+    
+    - name: Setup PM2 startup script
+      shell: env PATH=$PATH:/usr/bin pm2 startup systemd -u {{ ansible_user }} --hp /home/{{ ansible_user }}
+      ignore_errors: yes
+    
+    - name: Clone frontend repository
+      git:
+        repo: "{{ frontend_repo }}"
+        dest: "{{ frontend_dir }}"
+        version: "{{ frontend_branch }}"
+        key_file: "/home/{{ ansible_user }}/.ssh/frontend_deploy_key"
+        accept_hostkey: yes
+        force: yes
+      become_user: "{{ ansible_user }}"
+    
+    - name: Create frontend logs directory
+      file:
+        path: "{{ frontend_dir }}/logs"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+    
+    - name: Copy frontend environment secrets
+      copy:
+        src: "secrets/{{ env_name }}-frontend.env"
+        dest: "{{ frontend_dir }}/.env"
+        mode: '0600'
+        owner: "{{ ansible_user }}"
+    
+    - name: Install frontend dependencies
+      command: npm install
+      args:
+        chdir: "{{ frontend_dir }}"
+      become_user: "{{ ansible_user }}"
+    
+    - name: Deploy PM2 frontend configuration
+      template:
+        src: templates/pm2-frontend.config.js.j2
+        dest: "{{ frontend_dir }}/ecosystem.config.js"
+        owner: "{{ ansible_user }}"
+    
+    - name: Stop existing PM2 frontend process
+      shell: pm2 delete {{ env_name }}-subutai-frontend || true
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+    
+    - name: Start frontend with PM2
+      shell: pm2 start ecosystem.config.js
+      args:
+        chdir: "{{ frontend_dir }}"
+      become_user: "{{ ansible_user }}"
+    
+    - name: Save PM2 process list again
+      shell: pm2 save
+      become_user: "{{ ansible_user }}"
+    
+    - name: Deploy Nginx backend configuration
+      template:
+        src: templates/nginx-backend.conf.j2
+        dest: "/etc/nginx/sites-available/{{ env_name }}-subutai-backend.conf"
+    
+    - name: Enable Nginx backend site
+      file:
+        src: "/etc/nginx/sites-available/{{ env_name }}-subutai-backend.conf"
+        dest: "/etc/nginx/sites-enabled/{{ env_name }}-subutai-backend.conf"
+        state: link
+    
+    - name: Deploy Nginx frontend configuration
+      template:
+        src: templates/nginx-frontend.conf.j2
+        dest: "/etc/nginx/sites-available/{{ env_name }}-subutai-frontend.conf"
+    
+    - name: Enable Nginx frontend site
+      file:
+        src: "/etc/nginx/sites-available/{{ env_name }}-subutai-frontend.conf"
+        dest: "/etc/nginx/sites-enabled/{{ env_name }}-subutai-frontend.conf"
+        state: link
+    
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      failed_when: nginx_test.rc != 0
+    
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
+    
+    - name: Install Certbot
+      apt:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+    
+    - name: Obtain SSL certificate for backend
+      command: >
+        certbot --nginx -d {{ backend_domain }}
+        --non-interactive --agree-tos
+        --email {{ ssl_email }}
+        --redirect
+      register: certbot_backend
+      failed_when: certbot_backend.rc != 0 and 'Certificate not yet due for renewal' not in certbot_backend.stdout
+    
+    - name: Obtain SSL certificate for frontend
+      command: >
+        certbot --nginx -d {{ frontend_domain }}
+        --non-interactive --agree-tos
+        --email {{ ssl_email }}
+        --redirect
+      register: certbot_frontend
+      failed_when: certbot_frontend.rc != 0 and 'Certificate not yet due for renewal' not in certbot_frontend.stdout
+    
+    - name: Download CloudWatch Agent
+      get_url:
+        url: https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+        dest: /tmp/amazon-cloudwatch-agent.deb
+    
+    - name: Install CloudWatch Agent
+      apt:
+        deb: /tmp/amazon-cloudwatch-agent.deb
+        state: present
+    
+    - name: Deploy CloudWatch configuration
+      template:
+        src: templates/cloudwatch-config.json.j2
+        dest: /opt/aws/amazon-cloudwatch-agent/etc/cloudwatch-config.json
+        mode: '0644'
+    
+    - name: Start CloudWatch Agent
+      shell: >
+        /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl
+        -a fetch-config -m ec2 -s
+        -c file:/opt/aws/amazon-cloudwatch-agent/etc/cloudwatch-config.json
+      register: cloudwatch_start
+      failed_when: cloudwatch_start.rc != 0
+    
+    - name: Final Nginx restart
+      service:
+        name: nginx
+        state: restarted
+    
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "========================================="
+          - "Deployment Completed Successfully!"
+          - "========================================="
+          - "Backend URL: https://{{ backend_domain }}"
+          - "Frontend URL: https://{{ frontend_domain }}"
+          - ""
+          - "CloudWatch Log Groups:"
+          - "  - {{ log_group_backend }}"
+          - "  - {{ log_group_frontend }}"
+          - "  - {{ log_group_nginx }}"
+          - "========================================="
+

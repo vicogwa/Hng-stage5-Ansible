@@ -1,0 +1,62 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "{{ backend_dir }}/logs/app.log",
+            "log_group_name": "{{ log_group_backend }}",
+            "log_stream_name": "{instance_id}-app",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "{{ backend_dir }}/logs/pm2-error.log",
+            "log_group_name": "{{ log_group_backend }}",
+            "log_stream_name": "{instance_id}-error",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "{{ frontend_dir }}/logs/app.log",
+            "log_group_name": "{{ log_group_frontend }}",
+            "log_stream_name": "{instance_id}-app",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "{{ frontend_dir }}/logs/pm2-error.log",
+            "log_group_name": "{{ log_group_frontend }}",
+            "log_stream_name": "{instance_id}-error",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/nginx/{{ env_name }}-subutai-backend-access.log",
+            "log_group_name": "{{ log_group_nginx }}",
+            "log_stream_name": "{instance_id}-backend-access",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/nginx/{{ env_name }}-subutai-backend-error.log",
+            "log_group_name": "{{ log_group_nginx }}",
+            "log_stream_name": "{instance_id}-backend-error",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/nginx/{{ env_name }}-subutai-frontend-access.log",
+            "log_group_name": "{{ log_group_nginx }}",
+            "log_stream_name": "{instance_id}-frontend-access",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/nginx/{{ env_name }}-subutai-frontend-error.log",
+            "log_group_name": "{{ log_group_nginx }}",
+            "log_stream_name": "{instance_id}-frontend-error",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  }
+}
